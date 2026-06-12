@@ -143,7 +143,7 @@ def wait_for_workflow(client, name, namespace, timeout):
     """Wait for workflow to complete"""
     start_time = time.time()
     while time.time() - start_time < timeout:
-        workflow = client.get_workflow(name, namespace)
+        workflow = client.get_workflow(namespace, name)
         if not workflow:
             return None, "Workflow not found"
 
@@ -204,7 +204,7 @@ def run_module():
     timeout = module.params['timeout']
 
     # Get existing workflow
-    existing = client.get_workflow(name, namespace)
+    existing = client.get_workflow(namespace, name)
 
     if state == 'absent':
         if not existing:
@@ -213,7 +213,7 @@ def run_module():
         if module.check_mode:
             module.exit_json(changed=True, msg="Would delete workflow (check mode)")
 
-        result = client.delete_workflow(name, namespace)
+        result = client.delete_workflow(namespace, name)
         if result:
             module.exit_json(changed=True, msg="Workflow deleted")
         else:
@@ -235,7 +235,7 @@ def run_module():
         if module.check_mode:
             module.exit_json(changed=True, msg="Would update workflow (check mode)")
 
-        client.delete_workflow(name, namespace)
+        client.delete_workflow(namespace, name)
 
     # Create workflow
     if module.check_mode:

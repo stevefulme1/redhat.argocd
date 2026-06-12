@@ -25,7 +25,6 @@ options:
     description: Authentication token for ArgoCD API.
     type: str
     required: true
-    no_log: true
   validate_certs:
     description: Whether to validate SSL certificates.
     type: bool
@@ -50,11 +49,9 @@ options:
   password:
     description: Password for repository authentication.
     type: str
-    no_log: true
   ssh_private_key:
     description: SSH private key for Git repository authentication.
     type: str
-    no_log: true
   insecure:
     description: Skip server certificate verification.
     type: bool

@@ -163,7 +163,7 @@ def run_module():
     labels = module.params.get('labels')
 
     # Get existing template
-    existing = client.get_workflow_template(name, namespace)
+    existing = client.get_workflow_template(namespace, name)
 
     if state == 'absent':
         if not existing:
@@ -172,7 +172,7 @@ def run_module():
         if module.check_mode:
             module.exit_json(changed=True, msg="Would delete workflow template (check mode)")
 
-        result = client.delete_workflow_template(name, namespace)
+        result = client.delete_workflow_template(namespace, name)
         if result:
             module.exit_json(changed=True, msg="Workflow template deleted")
         else:

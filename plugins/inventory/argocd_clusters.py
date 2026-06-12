@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -13,7 +12,6 @@ __metaclass__ = type
 
 DOCUMENTATION = r'''
 name: argocd_clusters
-plugin_type: inventory
 short_description: ArgoCD clusters dynamic inventory plugin
 description:
   - Queries ArgoCD API to discover registered clusters
@@ -111,7 +109,6 @@ keyed_groups:
 from ansible.plugins.inventory import BaseInventoryPlugin, Constructable
 from ansible.errors import AnsibleError
 from ansible.module_utils.urls import open_url
-from ansible.module_utils.six.moves.urllib.parse import urlencode
 import json
 
 

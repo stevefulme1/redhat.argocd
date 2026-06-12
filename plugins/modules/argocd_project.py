@@ -25,7 +25,6 @@ options:
     description: Authentication token for ArgoCD API.
     type: str
     required: true
-    no_log: true
   validate_certs:
     description: Whether to validate SSL certificates.
     type: bool

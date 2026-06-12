@@ -25,7 +25,6 @@ options:
     description: Authentication token for ArgoCD API.
     type: str
     required: true
-    no_log: true
   validate_certs:
     description: Whether to validate SSL certificates.
     type: bool
@@ -50,7 +49,6 @@ options:
       bearer_token:
         description: Bearer token for authentication.
         type: str
-        no_log: true
       tls_client_config:
         description: TLS configuration.
         type: dict
@@ -67,7 +65,6 @@ options:
           key_data:
             description: Base64-encoded client key.
             type: str
-            no_log: true
   namespaces:
     description:
       - List of namespaces allowed for deployment.

@@ -208,7 +208,7 @@ def run_module():
     labels = module.params.get('labels')
 
     # Get existing cron workflow
-    existing = client.get_cron_workflow(name, namespace)
+    existing = client.get_cron_workflow(namespace, name)
 
     if state == 'absent':
         if not existing:
@@ -217,7 +217,7 @@ def run_module():
         if module.check_mode:
             module.exit_json(changed=True, msg="Would delete cron workflow (check mode)")
 
-        result = client.delete_cron_workflow(name, namespace)
+        result = client.delete_cron_workflow(namespace, name)
         if result:
             module.exit_json(changed=True, msg="Cron workflow deleted")
         else:
@@ -243,7 +243,7 @@ def run_module():
 
         # Update suspend field
         existing['spec']['suspend'] = desired_suspend
-        result = client.update_cron_workflow(name, namespace, existing)
+        result = client.update_cron_workflow(namespace, name, existing)
         if not result:
             module.fail_json(msg=f"Failed to {state.replace('ed', 'e')} cron workflow")
 
@@ -298,7 +298,7 @@ def run_module():
         if labels:
             cron_body['metadata']['labels'] = labels
 
-        result = client.update_cron_workflow(name, namespace, cron_body)
+        result = client.update_cron_workflow(namespace, name, cron_body)
         if not result:
             module.fail_json(msg="Failed to update cron workflow")
 

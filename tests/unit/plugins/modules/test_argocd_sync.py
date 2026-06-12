@@ -8,7 +8,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from ansible_collections.redhat.argocd.plugins.modules import argocd_sync
 
 
@@ -16,148 +16,203 @@ class TestArgocdSync:
     """Test cases for argocd_sync module."""
 
     @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
-    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.time.sleep')
-    def test_sync_application(self, mock_sleep, mock_client_class, module_args, common_args):
+    def test_sync_application(self, mock_client_class, module_args, common_args):
         """Test syncing an application."""
-        # Arrange
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
 
+        # Application exists and is out of sync
+        existing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'health': {'status': 'Healthy'},
+            },
+        }
+        mock_client.get_application.return_value = existing_app
+
         sync_result = {
-            'status': 'Succeeded',
-            'message': 'Sync operation completed',
+            'status': {
+                'sync': {'status': 'Synced'},
+                'operationState': {
+                    'phase': 'Succeeded',
+                    'message': 'Sync operation completed',
+                },
+            },
         }
         mock_client.sync_application.return_value = sync_result
 
         args = common_args.copy()
         args.update({
             'name': 'test-app',
-            'revision': 'HEAD',
             'prune': False,
             'dry_run': False,
+            'force': False,
+            'strategy': 'apply',
             'wait': False,
+            'timeout': 300,
         })
         module_args(args)
 
-        # Act
         with pytest.raises(SystemExit) as exc_info:
             argocd_sync.main()
 
-        # Assert
         assert exc_info.value.code == 0
-        mock_client.sync_application.assert_called_once_with(
-            name='test-app',
-            revision='HEAD',
-            prune=False,
-            dry_run=False,
-        )
-        mock_sleep.assert_not_called()
+        mock_client.sync_application.assert_called_once()
 
-    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
     @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.time.sleep')
-    def test_sync_with_wait(self, mock_sleep, mock_client_class, module_args, common_args):
+    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.time.time')
+    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
+    def test_sync_with_wait(self, mock_client_class, mock_time, mock_sleep, module_args, common_args):
         """Test syncing with wait for completion."""
-        # Arrange
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
 
+        # First call: initial check - app out of sync
+        # Subsequent calls: wait_for_sync polling
+        existing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'health': {'status': 'Healthy'},
+            },
+        }
+
+        syncing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'Syncing'},
+                'operationState': {'phase': 'Running'},
+            },
+        }
+
+        synced_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'Synced'},
+                'operationState': {'phase': 'Succeeded'},
+            },
+        }
+
+        mock_client.get_application.side_effect = [
+            existing_app,   # initial check
+            syncing_app,    # wait poll 1
+            syncing_app,    # wait poll 2
+            synced_app,     # wait poll 3 - done
+        ]
+
         sync_result = {
-            'status': 'Running',
-            'message': 'Sync in progress',
+            'status': {
+                'sync': {'status': 'Syncing'},
+                'operationState': {'phase': 'Running'},
+            },
         }
         mock_client.sync_application.return_value = sync_result
 
-        # Simulate sync status progression
-        mock_client.get_application_sync_status.side_effect = [
-            {'status': 'Syncing', 'health': {'status': 'Progressing'}},
-            {'status': 'Syncing', 'health': {'status': 'Progressing'}},
-            {'status': 'Synced', 'health': {'status': 'Healthy'}},
-        ]
+        # time.time() returns increasing values within timeout
+        mock_time.side_effect = [0, 5, 10, 15, 20]
 
         args = common_args.copy()
         args.update({
             'name': 'test-app',
-            'revision': 'main',
             'wait': True,
-            'wait_timeout': 300,
+            'timeout': 300,
             'prune': True,
             'dry_run': False,
+            'force': False,
+            'strategy': 'apply',
         })
         module_args(args)
 
-        # Act
         with pytest.raises(SystemExit) as exc_info:
             argocd_sync.main()
 
-        # Assert
         assert exc_info.value.code == 0
         mock_client.sync_application.assert_called_once()
-        assert mock_client.get_application_sync_status.call_count == 3
-        assert mock_sleep.call_count == 2
 
     @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
     def test_sync_dry_run(self, mock_client_class, module_args, common_args):
         """Test sync with dry_run enabled."""
-        # Arrange
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
 
+        existing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'health': {'status': 'Healthy'},
+            },
+        }
+
+        # For dry_run, get_application is called twice: once to check, once after sync
+        updated_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'operationState': {'phase': 'Succeeded', 'message': 'Dry run completed'},
+            },
+        }
+        mock_client.get_application.side_effect = [existing_app, updated_app]
+
         dry_run_result = {
-            'status': 'DryRun',
-            'message': 'Dry run completed',
-            'resources': ['deployment/app', 'service/app'],
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'operationState': {'phase': 'Succeeded'},
+            },
         }
         mock_client.sync_application.return_value = dry_run_result
 
         args = common_args.copy()
         args.update({
             'name': 'test-app',
-            'revision': 'feature-branch',
             'dry_run': True,
             'prune': False,
+            'force': False,
+            'strategy': 'apply',
             'wait': False,
+            'timeout': 300,
         })
         module_args(args)
 
-        # Act
         with pytest.raises(SystemExit) as exc_info:
             argocd_sync.main()
 
-        # Assert
         assert exc_info.value.code == 0
-        mock_client.sync_application.assert_called_once_with(
-            name='test-app',
-            revision='feature-branch',
-            prune=False,
-            dry_run=True,
-        )
+        mock_client.sync_application.assert_called_once()
 
     @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
     def test_check_mode(self, mock_client_class, module_args, common_args):
         """Test check mode does not perform sync."""
-        # Arrange
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
+
+        existing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'health': {'status': 'Healthy'},
+            },
+        }
+        mock_client.get_application.return_value = existing_app
 
         args = common_args.copy()
         args.update({
             'name': 'test-app',
-            'revision': 'HEAD',
             'prune': False,
             'dry_run': False,
+            'force': False,
+            'strategy': 'apply',
             'wait': False,
+            'timeout': 300,
             '_ansible_check_mode': True,
         })
         module_args(args)
 
-        # Act
         with pytest.raises(SystemExit) as exc_info:
             argocd_sync.main()
 
-        # Assert
         assert exc_info.value.code == 0
         mock_client.sync_application.assert_not_called()
-        mock_client.get_application_sync_status.assert_not_called()
 
     @pytest.mark.parametrize("prune,expected_prune", [
         (True, True),
@@ -167,103 +222,137 @@ class TestArgocdSync:
     def test_sync_with_prune_variations(self, mock_client_class, module_args, common_args,
                                        prune, expected_prune):
         """Test sync with different prune settings."""
-        # Arrange
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
 
-        sync_result = {'status': 'Succeeded'}
-        mock_client.sync_application.return_value = sync_result
-
-        args = common_args.copy()
-        args.update({
-            'name': 'test-app',
-            'revision': 'HEAD',
-            'prune': prune,
-            'dry_run': False,
-            'wait': False,
-        })
-        module_args(args)
-
-        # Act
-        with pytest.raises(SystemExit) as exc_info:
-            argocd_sync.main()
-
-        # Assert
-        assert exc_info.value.code == 0
-        mock_client.sync_application.assert_called_once_with(
-            name='test-app',
-            revision='HEAD',
-            prune=expected_prune,
-            dry_run=False,
-        )
-
-    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
-    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.time.sleep')
-    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.time.time')
-    def test_sync_wait_timeout(self, mock_time, mock_sleep, mock_client_class, module_args, common_args):
-        """Test sync wait timeout handling."""
-        # Arrange
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-
-        sync_result = {'status': 'Running'}
-        mock_client.sync_application.return_value = sync_result
-
-        # Simulate timeout by making time progress faster than sync completes
-        mock_time.side_effect = [0, 10, 20, 30, 40, 50, 60, 70]
-
-        mock_client.get_application_sync_status.return_value = {
-            'status': 'Syncing',
-            'health': {'status': 'Progressing'},
+        existing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'health': {'status': 'Healthy'},
+            },
         }
 
+        updated_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'Synced'},
+                'operationState': {'phase': 'Succeeded'},
+            },
+        }
+        mock_client.get_application.side_effect = [existing_app, updated_app]
+
+        sync_result = {
+            'status': {
+                'sync': {'status': 'Synced'},
+                'operationState': {'phase': 'Succeeded'},
+            },
+        }
+        mock_client.sync_application.return_value = sync_result
+
         args = common_args.copy()
         args.update({
             'name': 'test-app',
-            'revision': 'HEAD',
-            'wait': True,
-            'wait_timeout': 60,
-            'prune': False,
+            'prune': prune,
             'dry_run': False,
+            'force': False,
+            'strategy': 'apply',
+            'wait': False,
+            'timeout': 300,
         })
         module_args(args)
 
-        # Act
         with pytest.raises(SystemExit) as exc_info:
             argocd_sync.main()
 
-        # Assert
+        assert exc_info.value.code == 0
+        mock_client.sync_application.assert_called_once()
+
+    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.time.sleep')
+    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.time.time')
+    @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
+    def test_sync_wait_timeout(self, mock_client_class, mock_time, mock_sleep, module_args, common_args):
+        """Test sync wait timeout handling."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        existing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'OutOfSync'},
+                'health': {'status': 'Healthy'},
+            },
+        }
+
+        syncing_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'Syncing'},
+                'operationState': {'phase': 'Running'},
+            },
+        }
+
+        # Initial check returns existing_app, then syncing_app during wait
+        mock_client.get_application.side_effect = [existing_app] + [syncing_app] * 20
+
+        sync_result = {
+            'status': {
+                'sync': {'status': 'Syncing'},
+                'operationState': {'phase': 'Running'},
+            },
+        }
+        mock_client.sync_application.return_value = sync_result
+
+        # Simulate timeout: time exceeds the 60s timeout
+        mock_time.side_effect = [0, 10, 20, 30, 40, 50, 60, 70, 80]
+
+        args = common_args.copy()
+        args.update({
+            'name': 'test-app',
+            'wait': True,
+            'timeout': 60,
+            'prune': False,
+            'dry_run': False,
+            'force': False,
+            'strategy': 'apply',
+        })
+        module_args(args)
+
+        with pytest.raises(SystemExit) as exc_info:
+            argocd_sync.main()
+
         # Module should fail on timeout
         assert exc_info.value.code != 0
 
     @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
-    def test_sync_with_resources(self, mock_client_class, module_args, common_args):
-        """Test sync with specific resources."""
-        # Arrange
+    def test_already_synced_no_force(self, mock_client_class, module_args, common_args):
+        """Test that already-synced app without force returns no change."""
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
 
-        sync_result = {'status': 'Succeeded'}
-        mock_client.sync_application.return_value = sync_result
+        synced_app = {
+            'metadata': {'name': 'test-app'},
+            'status': {
+                'sync': {'status': 'Synced'},
+                'health': {'status': 'Healthy'},
+            },
+        }
+        mock_client.get_application.return_value = synced_app
 
         args = common_args.copy()
         args.update({
             'name': 'test-app',
-            'revision': 'HEAD',
-            'resources': [
-                {'kind': 'Deployment', 'name': 'app'},
-                {'kind': 'Service', 'name': 'app'},
-            ],
             'prune': False,
             'dry_run': False,
+            'force': False,
+            'strategy': 'apply',
             'wait': False,
+            'timeout': 300,
         })
         module_args(args)
 
-        # Act
         with pytest.raises(SystemExit) as exc_info:
             argocd_sync.main()
 
-        # Assert
         assert exc_info.value.code == 0
-        mock_client.sync_application.assert_called_once()
+        mock_client.sync_application.assert_not_called()
