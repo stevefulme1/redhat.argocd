@@ -17,10 +17,10 @@ tags:
   - kubernetes
   - continuous_delivery
 dependencies: {}
-repository: https://github.com/redhat/redhat.argocd
-documentation: https://github.com/redhat/redhat.argocd
-homepage: https://github.com/redhat/redhat.argocd
-issues: https://github.com/redhat/redhat.argocd/issues
+repository: https://github.com/stevefulme1/redhat.argocd
+documentation: https://github.com/stevefulme1/redhat.argocd
+homepage: https://github.com/stevefulme1/redhat.argocd
+issues: https://github.com/stevefulme1/redhat.argocd/issues
 build_ignore:
   - .gitignore
   - .ansible-lint
