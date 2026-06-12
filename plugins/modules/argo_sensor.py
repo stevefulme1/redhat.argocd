@@ -17,7 +17,7 @@ description:
   - Sensors define a set of event dependencies and triggers to execute.
 version_added: "0.1.0"
 author:
-  - Red Hat Ansible Automation Platform Team
+  - Red Hat, Inc. (@redhat-ansible)
 options:
   server_url:
     description:

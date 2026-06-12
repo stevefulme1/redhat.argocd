@@ -17,7 +17,7 @@ description:
   - EventSources define the source of events that trigger workflows.
 version_added: "0.1.0"
 author:
-  - Red Hat Ansible Automation Platform Team
+  - Red Hat, Inc. (@redhat-ansible)
 options:
   server_url:
     description:

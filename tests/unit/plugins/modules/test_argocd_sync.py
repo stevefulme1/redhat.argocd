@@ -219,8 +219,9 @@ class TestArgocdSync:
         (False, False),
     ])
     @patch('ansible_collections.redhat.argocd.plugins.modules.argocd_sync.ArgocdClient')
-    def test_sync_with_prune_variations(self, mock_client_class, module_args, common_args,
-                                       prune, expected_prune):
+    def test_sync_with_prune_variations(self, mock_client_class,
+                                        module_args, common_args,
+                                        prune, expected_prune):
         """Test sync with different prune settings."""
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client

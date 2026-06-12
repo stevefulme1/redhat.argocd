@@ -17,7 +17,7 @@ description:
   - EventBus is the transport layer for events between EventSources and Sensors.
 version_added: "0.1.0"
 author:
-  - Red Hat Ansible Automation Platform Team
+  - Red Hat, Inc. (@redhat-ansible)
 options:
   server_url:
     description:

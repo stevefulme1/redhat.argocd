@@ -17,8 +17,24 @@ description:
   - Supports check mode for validation
 version_added: "0.1.0"
 author:
-  - Red Hat Ansible Automation Platform Team
+  - Red Hat, Inc. (@redhat-ansible)
 options:
+  server_url:
+    description:
+      - URL of the ArgoCD server.
+    type: str
+    required: true
+  auth_token:
+    description:
+      - Authentication token for ArgoCD API.
+    type: str
+    required: true
+  validate_certs:
+    description:
+      - Whether to validate SSL certificates.
+    type: bool
+    default: true
+  server_url:n    description:n      - URL of the ArgoCD server.n    type: strn    required: truen  auth_token:n    description:n      - Authentication token for ArgoCD API.n    type: strn    required: truen  validate_certs:n    description:n      - Whether to validate SSL certificates.n    type: booln    default: true
   name:
     description:
       - Name of the workflow

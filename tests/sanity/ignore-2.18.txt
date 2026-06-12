@@ -1,2 +1,0 @@
-# Sanity test ignores for Ansible 2.18
-# This file is intentionally empty for initial collection setup
