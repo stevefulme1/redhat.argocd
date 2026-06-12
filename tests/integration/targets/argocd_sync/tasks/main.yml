@@ -1,0 +1,177 @@
+# -*- coding: utf-8 -*-
+# Copyright: (c) 2026, Red Hat, Inc.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+---
+# Integration tests for argocd_sync module
+
+- name: Set test application name
+  ansible.builtin.set_fact:
+    test_sync_app_name: "test-sync-app-{{ 999999 | random }}"
+
+- name: Create test application for sync
+  redhat.argocd.argocd_application:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    state: present
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/argoproj/argocd-example-apps
+        path: guestbook
+        targetRevision: HEAD
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+      syncPolicy:
+        automated: null
+  register: create_app_result
+
+- name: Verify application was created
+  ansible.builtin.assert:
+    that:
+      - create_app_result is changed
+      - create_app_result.application is defined
+
+- name: Wait for application to be ready
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Perform manual sync
+  redhat.argocd.argocd_sync:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    revision: HEAD
+    prune: false
+    dry_run: false
+    wait: false
+  register: sync_result
+
+- name: Verify sync was initiated
+  ansible.builtin.assert:
+    that:
+      - sync_result is changed
+      - sync_result.sync_result is defined
+
+- name: Perform sync with wait
+  redhat.argocd.argocd_sync:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    revision: HEAD
+    prune: false
+    dry_run: false
+    wait: true
+    wait_timeout: 300
+  register: sync_wait_result
+
+- name: Verify sync with wait completed
+  ansible.builtin.assert:
+    that:
+      - sync_wait_result is changed
+      - sync_wait_result.sync_result is defined
+
+- name: Retrieve application info after sync
+  redhat.argocd.argocd_application_info:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+  register: app_info_result
+
+- name: Verify application is synced
+  ansible.builtin.assert:
+    that:
+      - app_info_result.application is defined
+      - app_info_result.application.status.sync is defined
+
+- name: Perform dry run sync
+  redhat.argocd.argocd_sync:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    revision: HEAD
+    prune: false
+    dry_run: true
+    wait: false
+  register: dry_run_result
+
+- name: Verify dry run completed
+  ansible.builtin.assert:
+    that:
+      - dry_run_result is changed
+      - dry_run_result.sync_result is defined
+
+- name: Perform sync with prune
+  redhat.argocd.argocd_sync:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    revision: HEAD
+    prune: true
+    dry_run: false
+    wait: false
+  register: sync_prune_result
+
+- name: Verify sync with prune completed
+  ansible.builtin.assert:
+    that:
+      - sync_prune_result is changed
+      - sync_prune_result.sync_result is defined
+
+- name: Sync with specific revision
+  redhat.argocd.argocd_sync:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    revision: main
+    prune: false
+    dry_run: false
+    wait: false
+  register: sync_revision_result
+
+- name: Verify sync with specific revision completed
+  ansible.builtin.assert:
+    that:
+      - sync_revision_result is changed
+      - sync_revision_result.sync_result is defined
+
+- name: Test check mode (should not sync)
+  redhat.argocd.argocd_sync:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    revision: HEAD
+    prune: false
+    dry_run: false
+    wait: false
+  check_mode: true
+  register: check_mode_result
+
+- name: Verify check mode does not sync
+  ansible.builtin.assert:
+    that:
+      - check_mode_result is changed
+
+- name: Clean up test application
+  redhat.argocd.argocd_application:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_sync_app_name }}"
+    state: absent
+  register: cleanup_result
+
+- name: Verify cleanup completed
+  ansible.builtin.assert:
+    that:
+      - cleanup_result is changed

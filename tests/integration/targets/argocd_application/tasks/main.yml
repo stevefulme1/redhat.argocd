@@ -1,0 +1,139 @@
+# -*- coding: utf-8 -*-
+# Copyright: (c) 2026, Red Hat, Inc.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+---
+# Integration tests for argocd_application module
+
+- name: Set test application name
+  ansible.builtin.set_fact:
+    test_app_name: "test-app-{{ 999999 | random }}"
+
+- name: Create test application
+  redhat.argocd.argocd_application:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_app_name }}"
+    state: present
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/argoproj/argocd-example-apps
+        path: guestbook
+        targetRevision: HEAD
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+  register: create_result
+
+- name: Verify application was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.application is defined
+      - create_result.application.metadata.name == test_app_name
+
+- name: Retrieve application info
+  redhat.argocd.argocd_application_info:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_app_name }}"
+  register: info_result
+
+- name: Verify application exists
+  ansible.builtin.assert:
+    that:
+      - info_result.application is defined
+      - info_result.application.metadata.name == test_app_name
+      - info_result.application.spec.project == 'default'
+
+- name: Update application (change target revision)
+  redhat.argocd.argocd_application:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_app_name }}"
+    state: present
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/argoproj/argocd-example-apps
+        path: guestbook
+        targetRevision: main
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+  register: update_result
+
+- name: Verify application was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.application.spec.source.targetRevision == 'main'
+
+- name: Update application (no change - idempotency test)
+  redhat.argocd.argocd_application:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_app_name }}"
+    state: present
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/argoproj/argocd-example-apps
+        path: guestbook
+        targetRevision: main
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+  register: idempotent_result
+
+- name: Verify no change on idempotent run
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+- name: Delete application
+  redhat.argocd.argocd_application:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_app_name }}"
+    state: absent
+  register: delete_result
+
+- name: Verify application was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Verify application no longer exists
+  redhat.argocd.argocd_application_info:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_app_name }}"
+  register: verify_deleted
+  failed_when: false
+
+- name: Assert application is gone
+  ansible.builtin.assert:
+    that:
+      - verify_deleted.application is not defined or verify_deleted.application == none
+
+- name: Delete application (idempotency test)
+  redhat.argocd.argocd_application:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_app_name }}"
+    state: absent
+  register: delete_idempotent
+
+- name: Verify deletion is idempotent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed

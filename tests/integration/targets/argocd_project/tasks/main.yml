@@ -1,0 +1,173 @@
+# -*- coding: utf-8 -*-
+# Copyright: (c) 2026, Red Hat, Inc.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+---
+# Integration tests for argocd_project module
+
+- name: Set test project name
+  ansible.builtin.set_fact:
+    test_project_name: "test-project-{{ 999999 | random }}"
+
+- name: Create test project
+  redhat.argocd.argocd_project:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+    state: present
+    spec:
+      description: Integration test project
+      sourceRepos:
+        - https://github.com/argoproj/*
+      destinations:
+        - server: https://kubernetes.default.svc
+          namespace: default
+      clusterResourceWhitelist:
+        - group: '*'
+          kind: '*'
+  register: create_result
+
+- name: Verify project was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.project is defined
+      - create_result.project.metadata.name == test_project_name
+
+- name: Retrieve project info
+  redhat.argocd.argocd_project_info:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+  register: info_result
+
+- name: Verify project exists
+  ansible.builtin.assert:
+    that:
+      - info_result.project is defined
+      - info_result.project.metadata.name == test_project_name
+      - info_result.project.spec.description == 'Integration test project'
+
+- name: Update project (change description and add source repo)
+  redhat.argocd.argocd_project:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+    state: present
+    spec:
+      description: Updated integration test project
+      sourceRepos:
+        - https://github.com/argoproj/*
+        - https://github.com/kubernetes/*
+      destinations:
+        - server: https://kubernetes.default.svc
+          namespace: default
+      clusterResourceWhitelist:
+        - group: '*'
+          kind: '*'
+  register: update_result
+
+- name: Verify project was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.project.spec.description == 'Updated integration test project'
+      - update_result.project.spec.sourceRepos | length == 2
+
+- name: Update project (no change - idempotency test)
+  redhat.argocd.argocd_project:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+    state: present
+    spec:
+      description: Updated integration test project
+      sourceRepos:
+        - https://github.com/argoproj/*
+        - https://github.com/kubernetes/*
+      destinations:
+        - server: https://kubernetes.default.svc
+          namespace: default
+      clusterResourceWhitelist:
+        - group: '*'
+          kind: '*'
+  register: idempotent_result
+
+- name: Verify no change on idempotent run
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+- name: Add multiple destinations to project
+  redhat.argocd.argocd_project:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+    state: present
+    spec:
+      description: Updated integration test project
+      sourceRepos:
+        - https://github.com/argoproj/*
+        - https://github.com/kubernetes/*
+      destinations:
+        - server: https://kubernetes.default.svc
+          namespace: default
+        - server: https://kubernetes.default.svc
+          namespace: test-namespace
+      clusterResourceWhitelist:
+        - group: '*'
+          kind: '*'
+  register: multi_dest_result
+
+- name: Verify multiple destinations added
+  ansible.builtin.assert:
+    that:
+      - multi_dest_result is changed
+      - multi_dest_result.project.spec.destinations | length == 2
+
+- name: Delete project
+  redhat.argocd.argocd_project:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+    state: absent
+  register: delete_result
+
+- name: Verify project was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Verify project no longer exists
+  redhat.argocd.argocd_project_info:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+  register: verify_deleted
+  failed_when: false
+
+- name: Assert project is gone
+  ansible.builtin.assert:
+    that:
+      - verify_deleted.project is not defined or verify_deleted.project == none
+
+- name: Delete project (idempotency test)
+  redhat.argocd.argocd_project:
+    server_url: "{{ argocd_server_url }}"
+    auth_token: "{{ argocd_auth_token }}"
+    validate_certs: "{{ argocd_validate_certs | default(true) }}"
+    name: "{{ test_project_name }}"
+    state: absent
+  register: delete_idempotent
+
+- name: Verify deletion is idempotent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed

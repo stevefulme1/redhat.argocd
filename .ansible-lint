@@ -1,0 +1,5 @@
+---
+profile: production
+offline: true
+skip_list:
+  - experimental

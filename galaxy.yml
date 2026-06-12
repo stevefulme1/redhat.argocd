@@ -1,0 +1,36 @@
+---
+namespace: redhat
+name: argocd
+version: 0.1.0
+readme: README.md
+authors:
+  - Red Hat (@redhat)
+description: Ansible collection for managing Argo CD and Argo Workflows
+license:
+  - GPL-3.0-only
+license_file: LICENSE
+tags:
+  - argocd
+  - argo
+  - workflows
+  - gitops
+  - kubernetes
+  - continuous_delivery
+dependencies: {}
+repository: https://github.com/redhat/redhat.argocd
+documentation: https://github.com/redhat/redhat.argocd
+homepage: https://github.com/redhat/redhat.argocd
+issues: https://github.com/redhat/redhat.argocd/issues
+build_ignore:
+  - .gitignore
+  - .ansible-lint
+  - .yamllint
+  - .github
+  - changelogs/.plugin-cache.yaml
+  - tests/output
+  - "*.tar.gz"
+  - "*.pyc"
+  - __pycache__
+  - .pytest_cache
+  - .vscode
+  - .idea
