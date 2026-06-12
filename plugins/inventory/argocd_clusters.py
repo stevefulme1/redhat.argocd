@@ -79,23 +79,13 @@ requirements:
 '''
 
 EXAMPLES = r'''
-# Minimal inventory file (argocd.yml)
-plugin: redhat.argocd.argocd_clusters
-server_url: https://argocd.example.com
-auth_token: "{{ lookup('env', 'ARGOCD_AUTH_TOKEN') }}"
-
-# Group by cluster labels
+# Full-featured inventory file (argocd.yml)
 plugin: redhat.argocd.argocd_clusters
 server_url: https://argocd.example.com
 auth_token: "{{ lookup('env', 'ARGOCD_AUTH_TOKEN') }}"
 group_by:
   - labels
   - status
-
-# Use constructed features for custom grouping
-plugin: redhat.argocd.argocd_clusters
-server_url: https://argocd.example.com
-auth_token: "{{ lookup('env', 'ARGOCD_AUTH_TOKEN') }}"
 compose:
   cluster_env: labels.environment | default('unknown')
 groups:
