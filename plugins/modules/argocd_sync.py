@@ -34,7 +34,6 @@ options:
       - Whether to validate SSL certificates.
     type: bool
     default: true
-  server_url:n    description:n      - URL of the ArgoCD server.n    type: strn    required: truen  auth_token:n    description:n      - Authentication token for ArgoCD API.n    type: strn    required: truen  validate_certs:n    description:n      - Whether to validate SSL certificates.n    type: booln    default: true
   name:
     description:
       - Name of the ArgoCD application to sync
