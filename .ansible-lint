@@ -3,3 +3,6 @@ profile: production
 offline: true
 skip_list:
   - experimental
+exclude_paths:
+  - .serena/
+  - .github/

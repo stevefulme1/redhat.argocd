@@ -12,6 +12,7 @@ license_file: LICENSE
 tags:
   - argocd
   - argo
+  - cloud
   - workflows
   - gitops
   - kubernetes
