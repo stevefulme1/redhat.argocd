@@ -1,5 +1,5 @@
 ---
-namespace: redhat
+namespace: stevefulme1
 name: argocd
 version: 0.2.0
 readme: README.md
