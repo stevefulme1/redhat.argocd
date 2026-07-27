@@ -8,7 +8,6 @@ authors:
 description: Ansible collection for managing Argo CD and Argo Workflows
 license:
   - GPL-3.0-only
-license_file: LICENSE
 tags:
   - argocd
   - argo
